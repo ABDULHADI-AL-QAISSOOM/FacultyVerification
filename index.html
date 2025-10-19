@@ -6,29 +6,33 @@
   <title>Faculty Evaluation Verifier</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f9; color: #333; }
-    h1 { text-align: center; color: #222; }
-    .uploader { margin: 10px 0; }
-    .results { margin-top: 20px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    th { background: #333; color: #fff; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background: #f9fafc; color: #333; }
+    h1 { text-align: center; color: #1d3557; }
+    .uploader { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; }
+    label { font-weight: 600; }
+    input[type=file] { margin: 8px 0 16px 0; width: 100%; }
+    button { background: #1d3557; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; }
+    button:hover { background: #457b9d; }
+    .results { margin-top: 30px; }
+    .sheet-header { background: #457b9d; color: white; padding: 10px; border-radius: 6px; margin-top: 30px; font-weight: 600; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; background: white; border-radius: 8px; overflow: hidden; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #1d3557; color: #fff; }
     tr.mismatch { background-color: #ffe6e6; }
-    .sheet-header { background: #007bff; color: white; padding: 8px; border-radius: 4px; margin-top: 20px; }
-    button { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; }
-    button:hover { background: #0056b3; }
+    tr.match { background-color: #e6ffe6; }
+    .summary { font-weight: bold; margin-top: 10px; }
+    footer { text-align:center; margin-top:40px; color:#777; font-size: 14px; }
   </style>
 </head>
 <body>
   <h1>Faculty Evaluation Verifier</h1>
-
   <div class="uploader">
-    <label>Main File (Faculty Evaluation Analysis): </label>
-    <input type="file" id="mainFile" accept=".xlsx" /><br/><br/>
-    <label>Faculty Professorial File: </label>
-    <input type="file" id="profFile" accept=".xlsx" /><br/><br/>
-    <label>Faculty Lecturers File: </label>
-    <input type="file" id="lectFile" accept=".xlsx" /><br/><br/>
+    <label>Main File (Faculty Evaluation Analysis):</label>
+    <input type="file" id="mainFile" accept=".xlsx"><br>
+    <label>Faculty Professorial File:</label>
+    <input type="file" id="profFile" accept=".xlsx"><br>
+    <label>Faculty Lecturers File:</label>
+    <input type="file" id="lectFile" accept=".xlsx"><br>
     <button onclick="processFiles()">Process & Verify</button>
   </div>
 
@@ -63,6 +67,7 @@
         const sheetData = XLSX.utils.sheet_to_json(mainWorkbook.Sheets[sheetName]);
 
         let mismatches = [];
+        let matches = 0;
 
         sheetData.forEach(row => {
           const id = row['KFUPM ID'] || row['ID'];
@@ -72,17 +77,23 @@
 
           if (ref) {
             const fields = ['Overall Score', 'Positivity Score', 'Department'];
+            let mismatchFound = false;
+
             for (const field of fields) {
               const mainVal = (row[field] || '').toString().trim();
               const refVal = (ref[field] || '').toString().trim();
               if (mainVal !== refVal) {
                 mismatches.push({ KFUPMID: id, Field: field, MainValue: mainVal, RefValue: refVal });
+                mismatchFound = true;
               }
             }
+
+            if (!mismatchFound) matches++;
           }
         });
 
-        output += `<div class='sheet-header'>${sheetName} — Mismatches Found: ${mismatches.length}</div>`;
+        output += `<div class='sheet-header'>${sheetName}</div>`;
+        output += `<div class='summary'>Matches: ${matches} | Mismatches: ${mismatches.length}</div>`;
 
         if (mismatches.length > 0) {
           output += `<table><tr><th>KFUPM ID</th><th>Field</th><th>Main Value</th><th>Verification Value</th></tr>`;
@@ -91,7 +102,7 @@
           });
           output += `</table>`;
         } else {
-          output += `<p>No mismatches found in this sheet.</p>`;
+          output += `<p style='color:green;'>All values matched for this sheet.</p>`;
         }
       }
 
@@ -120,6 +131,7 @@
       });
     }
   </script>
-  <footer style="text-align:center; margin-top:40px; color:#555;">Designed π Hadi</footer>
+
+  <footer>Designed π Hadi</footer>
 </body>
 </html>
