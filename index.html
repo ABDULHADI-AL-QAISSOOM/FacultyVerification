@@ -1,137 +1,205 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Faculty Evaluation Verifier</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KFUPM Faculty Evaluation Verifier (Multi-Sheet)</title>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background: #f9fafc; color: #333; }
-    h1 { text-align: center; color: #1d3557; }
-    .uploader { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; }
-    label { font-weight: 600; }
-    input[type=file] { margin: 8px 0 16px 0; width: 100%; }
-    button { background: #1d3557; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; }
-    button:hover { background: #457b9d; }
-    .results { margin-top: 30px; }
-    .sheet-header { background: #457b9d; color: white; padding: 10px; border-radius: 6px; margin-top: 30px; font-weight: 600; }
-    table { border-collapse: collapse; width: 100%; margin-top: 10px; background: white; border-radius: 8px; overflow: hidden; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    th { background: #1d3557; color: #fff; }
-    tr.mismatch { background-color: #ffe6e6; }
-    tr.match { background-color: #e6ffe6; }
-    .summary { font-weight: bold; margin-top: 10px; }
-    footer { text-align:center; margin-top:40px; color:#777; font-size: 14px; }
+    body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;padding:20px;background:#f7fafc;color:#0f172a}
+    h1{font-size:22px;margin-bottom:6px}
+    .card{background:#fff;border-radius:12px;padding:18px;box-shadow:0 6px 18px rgba(2,6,23,0.06);margin-bottom:16px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    input[type=file]{padding:8px}
+    button{background:#0ea5a4;border:none;color:white;padding:10px 14px;border-radius:10px;cursor:pointer}
+    button.secondary{background:#64748b}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:8px;border-bottom:1px solid #e6eef6;text-align:left;font-size:13px}
+    tr.match{background:#f0fdf4}
+    tr.mismatch{background:#fff7f0}
+    .small{font-size:12px;color:#475569}
+    .footer{margin-top:18px;text-align:center;color:#94a3b8}
+    .badge{display:inline-block;padding:6px 8px;border-radius:999px;font-weight:600}
+    .green{background:#dcfce7;color:#065f46}
+    .red{background:#fff1f2;color:#7f1d1d}
+    .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .flexright{margin-left:auto}
+    .diff{font-weight:600}
+    .export{background:#2563eb}
+    .note{background:#f1f5f9;padding:10px;border-radius:8px;color:#0f172a}
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-  <h1>Faculty Evaluation Verifier</h1>
-  <div class="uploader">
-    <label>Main File (Faculty Evaluation Analysis):</label>
-    <input type="file" id="mainFile" accept=".xlsx"><br>
-    <label>Faculty Professorial File:</label>
-    <input type="file" id="profFile" accept=".xlsx"><br>
-    <label>Faculty Lecturers File:</label>
-    <input type="file" id="lectFile" accept=".xlsx"><br>
-    <button onclick="processFiles()">Process & Verify</button>
+  <h1>KFUPM Faculty Evaluation Verifier (Multi-Sheet)</h1>
+  <p class="small">Upload the <strong>Faculty Evaluation Analysis</strong> file and the two verification files from the system. The tool will automatically process these main sheets: <strong>All Faculty, CHM, CEP, CCM, CDB, CPG, KBS, CGS, PREP YEAR, DCC</strong>. It will use <strong>KFUPM ID</strong> as the key and <strong>Rank</strong> to determine which verification file to use.</p>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>Main file (Faculty Evaluation Analysis)<br><input id="fileMain" type="file" accept=".xlsx,.xls,.csv" /></label>
+      </div>
+      <div>
+        <label>Faculty Professorial (verification)<br><input id="fileProf" type="file" accept=".xlsx,.xls,.csv" /></label>
+      </div>
+      <div>
+        <label>Faculty Lecturers (verification)<br><input id="fileLect" type="file" accept=".xlsx,.xls,.csv" /></label>
+      </div>
+      <div style="align-self:center">
+        <button id="btnProcess">Process & Verify</button>
+      </div>
+      <div style="align-self:center">
+        <button id="btnExport" class="export" disabled>Export Results (CSV)</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px" class="note">
+      Comparison fields: <strong>Name, Department, Teaching, Research, Societal Benefits, Overall Points, Final Rating, Positivity Score</strong>.
+      The tool will verify each specified sheet from the main file.
+    </div>
   </div>
 
-  <div id="results" class="results"></div>
+  <div id="summary" class="card" style="display:none">
+    <div class="row">
+      <div><span class="badge green" id="countMatch">0 matched</span></div>
+      <div><span class="badge red" id="countMismatch">0 mismatched</span></div>
+      <div class="flexright small">Total checked: <strong id="countTotal">0</strong></div>
+    </div>
+    <div style="margin-top:8px">
+      <input id="filterInput" placeholder="Filter by KFUPM ID, name, department, or status" style="padding:8px;width:100%" />
+    </div>
+  </div>
 
-  <script>
-    async function processFiles() {
-      const mainFile = document.getElementById('mainFile').files[0];
-      const profFile = document.getElementById('profFile').files[0];
-      const lectFile = document.getElementById('lectFile').files[0];
-      if (!mainFile || !profFile || !lectFile) {
-        alert('Please upload all three files.');
-        return;
-      }
+  <div id="results" class="card" style="display:none;overflow:auto;max-height:56vh">
+    <table id="resultsTable">
+      <thead>
+        <tr>
+          <th>Sheet</th>
+          <th>KFUPM ID</th>
+          <th>Rank</th>
+          <th>Name (Main)</th>
+          <th>Name (Verify)</th>
+          <th>Department (Main)</th>
+          <th>Department (Verify)</th>
+          <th>Teaching</th>
+          <th>Research</th>
+          <th>Societal Benefits</th>
+          <th>Overall Points</th>
+          <th>Final Rating</th>
+          <th>Positivity Score</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
-      const mainWorkbook = await readWorkbook(mainFile);
-      const profWorkbook = await readWorkbook(profFile);
-      const lectWorkbook = await readWorkbook(lectFile);
+  <footer class="footer">Designed π Hadi</footer>
 
-      const profData = XLSX.utils.sheet_to_json(profWorkbook.Sheets[profWorkbook.SheetNames[0]]);
-      const lectData = XLSX.utils.sheet_to_json(lectWorkbook.Sheets[lectWorkbook.SheetNames[0]]);
+<script>
+(() => {
+  const TARGET_SHEETS = ['All Faculty','CHM','CEP','CCM','CDB','CPG','KBS','CGS','PREP YEAR','DCC'];
 
-      const profMap = mapByKFUPMID(profData);
-      const lectMap = mapByKFUPMID(lectData);
+  const fileMain = document.getElementById('fileMain');
+  const fileProf = document.getElementById('fileProf');
+  const fileLect = document.getElementById('fileLect');
+  const btnProcess = document.getElementById('btnProcess');
+  const resultsTableBody = document.querySelector('#resultsTable tbody');
+  const summary = document.getElementById('summary');
+  const countMatch = document.getElementById('countMatch');
+  const countMismatch = document.getElementById('countMismatch');
+  const countTotal = document.getElementById('countTotal');
+  const btnExport = document.getElementById('btnExport');
+  const filterInput = document.getElementById('filterInput');
 
-      const sheetNames = ["All Faculty", "CHM", "CEP", "CCM", "CDB", "CPG", "KBS", "CGS", "PREP YEAR", "DCC"];
+  function readFileAsync(file){
+    return new Promise((resolve,reject)=>{
+      const reader = new FileReader();
+      reader.onload = e => resolve(XLSX.read(e.target.result, {type:'binary'}));
+      reader.onerror = reject;
+      reader.readAsBinaryString(file);
+    });
+  }
+  function sheetToJsonSafe(wb,sheetName){
+    const sh = wb.Sheets[sheetName];
+    if(!sh) return [];
+    return XLSX.utils.sheet_to_json(sh,{defval:''});
+  }
+  function normalize(v){return String(v??'').trim();}
+  function compare(a,b){
+    const na = normalize(a).toLowerCase();
+    const nb = normalize(b).toLowerCase();
+    const naNum = parseFloat(na.replace(/,/g,''));
+    const nbNum = parseFloat(nb.replace(/,/g,''));
+    if(!isNaN(naNum) && !isNaN(nbNum)) return Math.abs(naNum-nbNum)<1e-6;
+    return na===nb;
+  }
 
-      let output = '';
+  btnProcess.addEventListener('click',async()=>{
+    btnProcess.disabled=true;btnProcess.textContent='Processing...';
+    try{
+      const [wbMain,wbProf,wbLect] = await Promise.all([
+        readFileAsync(fileMain.files[0]),readFileAsync(fileProf.files[0]),readFileAsync(fileLect.files[0])
+      ]);
+      const profRows = sheetToJsonSafe(wbProf,wbProf.SheetNames[0]);
+      const lectRows = sheetToJsonSafe(wbLect,wbLect.SheetNames[0]);
+      const mapProf = new Map(profRows.map(r=>[normalize(r['KFUPM ID']||r['ID']),r]));
+      const mapLect = new Map(lectRows.map(r=>[normalize(r['KFUPM ID']||r['ID']),r]));
 
-      for (const sheetName of sheetNames) {
-        if (!mainWorkbook.Sheets[sheetName]) continue;
-        const sheetData = XLSX.utils.sheet_to_json(mainWorkbook.Sheets[sheetName]);
+      let matched=0,mismatched=0,total=0;
+      resultsTableBody.innerHTML='';
+      window._exportRows=[];
 
-        let mismatches = [];
-        let matches = 0;
-
-        sheetData.forEach(row => {
-          const id = row['KFUPM ID'] || row['ID'];
-          const rank = (row['Rank'] || '').toLowerCase();
-          const source = rank.includes('prof') ? profMap : lectMap;
-          const ref = source[id];
-
-          if (ref) {
-            const fields = ['Overall Score', 'Positivity Score', 'Department'];
-            let mismatchFound = false;
-
-            for (const field of fields) {
-              const mainVal = (row[field] || '').toString().trim();
-              const refVal = (ref[field] || '').toString().trim();
-              if (mainVal !== refVal) {
-                mismatches.push({ KFUPMID: id, Field: field, MainValue: mainVal, RefValue: refVal });
-                mismatchFound = true;
-              }
-            }
-
-            if (!mismatchFound) matches++;
+      for(const sheet of TARGET_SHEETS){
+        if(!wbMain.SheetNames.includes(sheet)) continue;
+        const mainRows = sheetToJsonSafe(wbMain,sheet);
+        for(const mainRow of mainRows){
+          total++;
+          const id = normalize(mainRow['KFUPM ID']||mainRow['ID']);
+          const rank = normalize(mainRow['Rank']);
+          const isProf = rank.toLowerCase().includes('profess');
+          const vRow = isProf ? mapProf.get(id) : mapLect.get(id);
+          let rowStatus='matched';
+          if(!vRow) rowStatus='mismatched';
+          const fields=['Name','Department','Teaching','Research','Societal Benefits','Overall Points','Final Rating','Positivity Score'];
+          for(const f of fields){
+            if(!vRow || !compare(mainRow[f],vRow[f])){rowStatus='mismatched';}
           }
-        });
+          if(rowStatus==='matched') matched++; else mismatched++;
 
-        output += `<div class='sheet-header'>${sheetName}</div>`;
-        output += `<div class='summary'>Matches: ${matches} | Mismatches: ${mismatches.length}</div>`;
+          const tr=document.createElement('tr');
+          tr.className=rowStatus==='matched'?'match':'mismatch';
+          tr.innerHTML=`<td>${sheet}</td><td>${id}</td><td>${rank}</td><td>${mainRow['Name']||''}</td><td>${vRow?vRow['Name']||'':''}</td><td>${mainRow['Department']||''}</td><td>${vRow?vRow['Department']||'':''}</td><td>${mainRow['Teaching']||''}</td><td>${mainRow['Research']||''}</td><td>${mainRow['Societal Benefits']||''}</td><td>${mainRow['Overall Points']||''}</td><td>${mainRow['Final Rating']||''}</td><td>${mainRow['Positivity Score']||''}</td><td><span class="badge ${rowStatus==='matched'?'green':'red'}">${rowStatus==='matched'?'Matched':'Mismatch'}</span></td>`;
+          resultsTableBody.appendChild(tr);
 
-        if (mismatches.length > 0) {
-          output += `<table><tr><th>KFUPM ID</th><th>Field</th><th>Main Value</th><th>Verification Value</th></tr>`;
-          mismatches.forEach(m => {
-            output += `<tr class='mismatch'><td>${m.KFUPMID}</td><td>${m.Field}</td><td>${m.MainValue}</td><td>${m.RefValue}</td></tr>`;
-          });
-          output += `</table>`;
-        } else {
-          output += `<p style='color:green;'>All values matched for this sheet.</p>`;
+          window._exportRows.push({Sheet:sheet,'KFUPM ID':id,Rank:rank,Status:rowStatus});
         }
       }
 
-      document.getElementById('results').innerHTML = output;
-    }
+      countTotal.textContent=total;
+      countMatch.textContent=`${matched} matched`;
+      countMismatch.textContent=`${mismatched} mismatched`;
+      summary.style.display='';
+      document.getElementById('results').style.display='';
+      btnExport.disabled=false;
 
-    function mapByKFUPMID(data) {
-      const map = {};
-      data.forEach(row => {
-        const id = row['KFUPM ID'] || row['ID'];
-        if (id) map[id] = row;
+      filterInput.addEventListener('input',e=>{
+        const q=e.target.value.toLowerCase();
+        for(const tr of resultsTableBody.querySelectorAll('tr')){
+          tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';
+        }
       });
-      return map;
-    }
 
-    function readWorkbook(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = e => {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          resolve(workbook);
-        };
-        reader.onerror = reject;
-        reader.readAsArrayBuffer(file);
-      });
-    }
-  </script>
+    }catch(e){alert('Error: '+e.message);}finally{btnProcess.disabled=false;btnProcess.textContent='Process & Verify';}
+  });
 
-  <footer>Designed π Hadi</footer>
+  btnExport.addEventListener('click',()=>{
+    const rows=window._exportRows||[];if(!rows.length)return;
+    const csv=[Object.keys(rows[0]).join(',')];
+    for(const r of rows){csv.push(Object.values(r).map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(','));}
+    const blob=new Blob([csv.join('\n')],{type:'text/csv'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='verification_results.csv';a.click();
+  });
+})();
+</script>
 </body>
 </html>
